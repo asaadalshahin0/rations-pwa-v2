@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f4ead8" />
+  <title>Rations</title>
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="top">
+      <div>
+        <p class="eyebrow">Minimal food tracking</p>
+        <h1>Rations</h1>
+      </div>
+      <button id="themeBtn" class="ghost" type="button" aria-label="Toggle dark mode">Dark</button>
+    </header>
+
+    <nav class="tabs" aria-label="Main tabs">
+      <button class="tab active" data-tab="scan" type="button">Scan</button>
+      <button class="tab" data-tab="today" type="button">Today</button>
+      <button class="tab" data-tab="history" type="button">History</button>
+      <button class="tab" data-tab="goals" type="button">Goals</button>
+    </nav>
+
+    <section id="scanTab" class="screen active-screen">
+      <section class="card scan-card">
+        <div class="section-head">
+          <div>
+            <h2>Estimate a meal</h2>
+            <p class="muted">Take a food photo. Add notes if portions are unclear.</p>
+          </div>
+        </div>
+        <input id="photoInput" type="file" accept="image/*" capture="environment" hidden />
+        <button id="pickBtn" class="primary" type="button">Take / Choose Food Photo</button>
+        <img id="preview" class="preview" alt="Meal preview" hidden />
+        <textarea id="notes" rows="3" placeholder="Optional: 2 eggs, extra sauce, half plate rice, etc."></textarea>
+        <button id="analyzeBtn" class="primary soft" type="button" disabled>Estimate Calories + Macros</button>
+        <p id="status" class="status"></p>
+      </section>
+
+      <section id="result" class="card" hidden>
+        <div class="result-head">
+          <div>
+            <p class="label">Estimated Meal</p>
+            <h2 id="mealName">—</h2>
+          </div>
+          <div class="calories"><span id="calories">0</span><small>cal</small></div>
+        </div>
+
+        <div class="macro-list">
+          <div class="macro"><span>Protein</span><strong id="protein">0g</strong></div>
+          <div class="macro"><span>Carbs</span><strong id="carbs">0g</strong></div>
+          <div class="macro"><span>Fat</span><strong id="fat">0g</strong></div>
+          <div class="macro"><span>Fiber</span><strong id="fiber">0g</strong></div>
+        </div>
+
+        <p id="confidence" class="muted"></p>
+        <p id="coachNote" class="note"></p>
+        <div id="items" class="items"></div>
+        <button id="logBtn" class="primary" type="button">Log Meal</button>
+      </section>
+    </section>
+
+    <section id="todayTab" class="screen">
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>Today</h2>
+            <p class="muted" id="todayDate"></p>
+          </div>
+          <button id="clearBtn" class="ghost" type="button">Clear</button>
+        </div>
+        <div class="totals">
+          <div><span>Calories</span><strong id="totalCalories">0</strong></div>
+          <div><span>Protein</span><strong id="totalProtein">0g</strong></div>
+          <div><span>Carbs</span><strong id="totalCarbs">0g</strong></div>
+          <div><span>Fat</span><strong id="totalFat">0g</strong></div>
+        </div>
+        <div id="log" class="log"></div>
+      </section>
+    </section>
+
+    <section id="historyTab" class="screen">
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>History</h2>
+            <p class="muted">All meals saved on this device.</p>
+          </div>
+          <button id="clearHistoryBtn" class="ghost" type="button">Clear All</button>
+        </div>
+        <div id="history" class="history"></div>
+      </section>
+    </section>
+
+    <section id="goalsTab" class="screen">
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>Daily Goals</h2>
+            <p class="muted">Stored locally on this device.</p>
+          </div>
+        </div>
+        <div class="goal-grid">
+          <label>Calories <input id="goalCalories" type="number" inputmode="numeric" /></label>
+          <label>Protein g <input id="goalProtein" type="number" inputmode="numeric" /></label>
+          <label>Carbs g <input id="goalCarbs" type="number" inputmode="numeric" /></label>
+          <label>Fat g <input id="goalFat" type="number" inputmode="numeric" /></label>
+        </div>
+        <button id="saveGoals" class="primary" type="button">Save Goals</button>
+      </section>
+    </section>
+  </main>
+
+  <div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-busy="true" hidden>
+    <div class="loading-card">
+      <div class="loader-ring"><span></span><span></span><span></span></div>
+      <p class="loading-kicker">Estimating ration</p>
+      <h2 id="loadingTitle">Reading the plate…</h2>
+      <p id="loadingLine" class="loading-line">Checking portions, hidden oils, and macros.</p>
+      <div class="loading-bar"><i></i></div>
+    </div>
+  </div>
+  <script src="/app.js"></script>
+</body>
+</html>

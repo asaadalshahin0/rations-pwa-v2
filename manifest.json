@@ -1,0 +1,10 @@
+{
+  "name": "Rations",
+  "short_name": "Rations",
+  "description": "Minimal photo calorie and macro tracking.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4ead8",
+  "theme_color": "#f4ead8",
+  "icons": [{"src":"/icon.svg","sizes":"any","type":"image/svg+xml"}]
+}
