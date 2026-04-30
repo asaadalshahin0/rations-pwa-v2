@@ -142,5 +142,20 @@ function fillGoals(){
 $('saveGoals').onclick=()=>{ localStorage.setItem(goalsKey, JSON.stringify({calories:+$('goalCalories').value||2200, protein:+$('goalProtein').value||160, carbs:+$('goalCarbs').value||250, fat:+$('goalFat').value||70})); renderAll(); alert('Goals saved.'); };
 function renderAll(){ renderToday(); renderHistory(); fillGoals(); }
 
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
+if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
+  navigator.serviceWorker.register('/sw.js').then((registration) => {
+    // Check for a new service worker shortly after load, then periodically.
+    registration.update();
+    setInterval(() => registration.update(), 60 * 60 * 1000);
+  }).catch(() => {});
+}
 renderAll();
+
