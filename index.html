@@ -30,13 +30,13 @@
         <div class="section-head">
           <div>
             <h2>Estimate a meal</h2>
-            <p class="muted">Take a food photo. Add notes if portions are unclear.</p>
+            <p class="muted">Take a food photo or describe the meal. Add portions when you can.</p>
           </div>
         </div>
         <input id="photoInput" type="file" accept="image/*" capture="environment" hidden />
         <button id="pickBtn" class="primary" type="button">Take / Choose Food Photo</button>
         <img id="preview" class="preview" alt="Meal preview" hidden />
-        <textarea id="notes" rows="3" placeholder="Optional: 2 eggs, extra sauce, half plate rice, etc."></textarea>
+        <textarea id="notes" rows="3" maxlength="1200" placeholder="Describe it: 2 eggs, extra sauce, half plate rice, etc."></textarea>
         <button id="analyzeBtn" class="primary soft" type="button" disabled>Estimate Calories + Macros</button>
         <p id="status" class="status"></p>
       </section>
