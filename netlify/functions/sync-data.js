@@ -2,7 +2,7 @@ const { getStore } = require('@netlify/blobs');
 
 exports.handler = async (event) => {
   try {
-    const store = getStore('rations-sync');
+    const store = syncStore();
 
     if (event.httpMethod === 'GET') {
       const id = event.queryStringParameters?.id || new URLSearchParams(event.rawQuery || '').get('id') || '';
@@ -49,9 +49,16 @@ function validPayload(payload){
 function syncErrorMessage(err){
   const message = err?.message || '';
   const name = err?.name || 'Error';
-  if (message.includes('MissingBlobsEnvironmentError')) return 'Sync storage is not configured on this deploy yet.';
+  if (message.includes('MissingBlobsEnvironmentError')) return 'Add NETLIFY_BLOBS_TOKEN in Netlify environment variables, then redeploy.';
   if (message.includes('Cannot find module') || message.includes('@netlify/blobs')) return 'Sync storage dependency is missing. Redeploy the latest GitHub commit.';
   return `Sync storage failed on the server. ${name}`;
+}
+
+function syncStore(){
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_AUTH_TOKEN;
+  if (siteID && token) return getStore('rations-sync', { siteID, token });
+  return getStore('rations-sync');
 }
 
 function json(body, statusCode=200){
