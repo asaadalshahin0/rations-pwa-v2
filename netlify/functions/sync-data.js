@@ -48,9 +48,10 @@ function validPayload(payload){
 
 function syncErrorMessage(err){
   const message = err?.message || '';
+  const name = err?.name || 'Error';
   if (message.includes('MissingBlobsEnvironmentError')) return 'Sync storage is not configured on this deploy yet.';
   if (message.includes('Cannot find module') || message.includes('@netlify/blobs')) return 'Sync storage dependency is missing. Redeploy the latest GitHub commit.';
-  return 'Sync storage failed on the server.';
+  return `Sync storage failed on the server. ${name}`;
 }
 
 function json(body, statusCode=200){
