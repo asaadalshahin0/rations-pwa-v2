@@ -1,6 +1,7 @@
+const { getStore } = require('@netlify/blobs');
+
 exports.handler = async (event) => {
   try {
-    const { getStore } = await import('@netlify/blobs');
     const store = getStore('rations-sync');
 
     if (event.httpMethod === 'GET') {
@@ -26,7 +27,8 @@ exports.handler = async (event) => {
 
     return json({ error:'Method not allowed' }, 405);
   } catch (err) {
-    return json({ error:err.message || 'Server error' }, 500);
+    console.error(err);
+    return json({ error:syncErrorMessage(err) }, 500);
   }
 };
 
@@ -42,6 +44,13 @@ function validPayload(payload){
     typeof payload.iv === 'string' &&
     typeof payload.data === 'string'
   );
+}
+
+function syncErrorMessage(err){
+  const message = err?.message || '';
+  if (message.includes('MissingBlobsEnvironmentError')) return 'Sync storage is not configured on this deploy yet.';
+  if (message.includes('Cannot find module') || message.includes('@netlify/blobs')) return 'Sync storage dependency is missing. Redeploy the latest GitHub commit.';
+  return 'Sync storage failed on the server.';
 }
 
 function json(body, statusCode=200){

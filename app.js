@@ -188,9 +188,13 @@ async function readRemoteSync(phrase){
   const id = await syncIdForPhrase(phrase);
   const res = await fetch(`/.netlify/functions/sync-data?id=${encodeURIComponent(id)}`);
   if(res.status === 404) return null;
-  if(!res.ok) throw new Error(await res.text());
+  if(!res.ok) throw new Error(await syncErrorText(res));
   const { payload } = await res.json();
-  return decryptData(phrase, payload);
+  try {
+    return await decryptData(phrase, payload);
+  } catch {
+    throw new Error('That phrase found data, but could not unlock it.');
+  }
 }
 async function writeRemoteSync(phrase, data){
   const id = await syncIdForPhrase(phrase);
@@ -200,7 +204,15 @@ async function writeRemoteSync(phrase, data){
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({ id, payload })
   });
-  if(!res.ok) throw new Error(await res.text());
+  if(!res.ok) throw new Error(await syncErrorText(res));
+}
+async function syncErrorText(res){
+  try {
+    const data = await res.json();
+    return data.error || `Sync request failed (${res.status})`;
+  } catch {
+    return `Sync request failed (${res.status})`;
+  }
 }
 function syncPhrase(){
   return $('syncPhrase').value.trim();
@@ -220,7 +232,7 @@ async function syncNow(){
     setSyncStatus('Synced. Use this same phrase on your other device.');
   } catch (err) {
     console.warn(err);
-    setSyncStatus('Sync failed. Check the phrase and try again.');
+    setSyncStatus(err.message || 'Sync failed. Check the phrase and try again.');
   } finally {
     setSyncButtons(false);
   }
@@ -236,7 +248,7 @@ async function pullSync(){
     setSyncStatus('Pulled latest data onto this device.');
   } catch (err) {
     console.warn(err);
-    setSyncStatus('Pull failed. Check the phrase and try again.');
+    setSyncStatus(err.message || 'Pull failed. Check the phrase and try again.');
   } finally {
     setSyncButtons(false);
   }

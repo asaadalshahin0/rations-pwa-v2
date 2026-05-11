@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rations-cache-v6';
+const CACHE_NAME = 'rations-cache-v7';
 const APP_SHELL = [
   '/',
   '/index.html',
