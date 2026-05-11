@@ -100,6 +100,9 @@ function setLoading(on){
   }
 }
 function escapeHtml(s){ return String(s).replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'}[c])); }
+function macroText(item){
+  return `P ${Math.round(item.protein_g || 0)}g · C ${Math.round(item.carbs_g || 0)}g · F ${Math.round(item.fat_g || 0)}g · Fiber ${Math.round(item.fiber_g || 0)}g`;
+}
 
 function setTheme(theme){
   document.body.classList.toggle('dark', theme === 'dark');
@@ -166,7 +169,7 @@ function showResult(data){
   $('fiber').textContent = `${Math.round(data.fiber_g || 0)}g`;
   $('confidence').textContent = `Confidence: ${data.confidence || 'unknown'}`;
   $('coachNote').textContent = data.coach_note || data.notes || '';
-  $('items').innerHTML = (data.items || []).map(i => `<div class="item"><div><strong>${escapeHtml(i.name||'Item')}</strong><small>${escapeHtml(i.portion||'estimated portion')}</small></div><div><strong>${Math.round(i.calories||0)}</strong><small>cal</small></div></div>`).join('');
+  $('items').innerHTML = (data.items || []).map(i => `<div class="item"><div><strong>${escapeHtml(i.name||'Item')}</strong><small>${escapeHtml(i.portion||'estimated portion')}</small><small>${macroText(i)}</small></div><div><strong>${Math.round(i.calories||0)}</strong><small>cal</small></div></div>`).join('');
   $('result').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
