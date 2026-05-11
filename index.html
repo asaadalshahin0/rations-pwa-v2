@@ -112,6 +112,21 @@
         </div>
         <button id="saveGoals" class="primary" type="button">Save Goals</button>
       </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <h2>Cloud Sync</h2>
+            <p class="muted">Use the same private phrase on each device.</p>
+          </div>
+        </div>
+        <label>Sync phrase <input id="syncPhrase" type="password" autocomplete="current-password" /></label>
+        <div class="sync-actions">
+          <button id="syncNowBtn" class="primary soft" type="button">Sync Now</button>
+          <button id="pullSyncBtn" class="ghost" type="button">Pull Latest</button>
+        </div>
+        <p id="syncStatus" class="status"></p>
+      </section>
     </section>
   </main>
 

@@ -17,6 +17,8 @@ const dayKey = (iso=todayISO()) => `rations:${iso}`;
 const goalsKey = 'rations:goals';
 const themeKey = 'rations:theme';
 const defaultGoals = { calories:2200, protein:160, carbs:250, fat:70 };
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
 
 const demo = {
   meal_name:'Chicken rice bowl', calories:720, protein_g:48, carbs_g:82, fat_g:22, fiber_g:6,
@@ -75,6 +77,7 @@ function goals(){
   return { ...defaultGoals, ...stored };
 }
 function setStatus(msg){ $('status').textContent = msg || ''; }
+function setSyncStatus(msg){ $('syncStatus').textContent = msg || ''; }
 const loadingLines = [
   'Checking portions, hidden oils, and macros.',
   'Estimating protein, carbs, fats, and fiber.',
@@ -102,6 +105,141 @@ function setLoading(on){
 function escapeHtml(s){ return String(s).replace(/[&<>'"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','"':'&quot;'}[c])); }
 function macroText(item){
   return `P ${Math.round(item.protein_g || 0)}g · C ${Math.round(item.carbs_g || 0)}g · F ${Math.round(item.fat_g || 0)}g · Fiber ${Math.round(item.fiber_g || 0)}g`;
+}
+function mealId(){
+  return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+function normalizeMeal(meal, day, index=0){
+  const at = meal.at || new Date().toISOString();
+  const fallbackId = `legacy:${day}:${at}:${meal.meal_name || 'Meal'}:${Math.round(meal.calories || 0)}:${index}`;
+  return { ...meal, id:meal.id || fallbackId, at };
+}
+function mergeMeals(localList, remoteList, day){
+  const byId = new Map();
+  [...localList, ...remoteList].forEach((meal, index) => {
+    const normalized = normalizeMeal(meal, day, index);
+    byId.set(normalized.id, { ...(byId.get(normalized.id) || {}), ...normalized });
+  });
+  return [...byId.values()]
+    .sort((a,b)=>new Date(b.at || 0) - new Date(a.at || 0))
+    .slice(0, 200);
+}
+function exportRationsData(){
+  const data = { version:1, updatedAt:new Date().toISOString(), goals:goals(), meals:{} };
+  historyDays().forEach(day => {
+    data.meals[day] = meals(day).map((meal, index) => normalizeMeal(meal, day, index));
+  });
+  return data;
+}
+function importRationsData(remoteData, options={}){
+  const remoteMeals = remoteData?.meals || {};
+  const days = new Set([...historyDays(), ...Object.keys(remoteMeals)]);
+  days.forEach(day => {
+    const merged = mergeMeals(meals(day), Array.isArray(remoteMeals[day]) ? remoteMeals[day] : [], day);
+    if(merged.length) localStorage.setItem(dayKey(day), JSON.stringify(merged));
+  });
+  const useRemoteGoals = options.preferRemoteGoals || !localStorage.getItem(goalsKey);
+  if(remoteData?.goals && useRemoteGoals) localStorage.setItem(goalsKey, JSON.stringify({ ...defaultGoals, ...remoteData.goals }));
+  renderAll();
+}
+function bytesToBase64(bytes){
+  let binary = '';
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+function base64ToBytes(value){
+  return Uint8Array.from(atob(value), char => char.charCodeAt(0));
+}
+function randomBase64(length){
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return bytesToBase64(bytes);
+}
+async function shaHex(text){
+  const hash = await crypto.subtle.digest('SHA-256', textEncoder.encode(text));
+  return [...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+async function syncIdForPhrase(phrase){
+  return shaHex(`rations-sync:${phrase}`);
+}
+async function keyForPhrase(phrase, saltBase64){
+  const keyMaterial = await crypto.subtle.importKey('raw', textEncoder.encode(phrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt:base64ToBytes(saltBase64), iterations:150000, hash:'SHA-256' },
+    keyMaterial,
+    { name:'AES-GCM', length:256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+async function encryptData(phrase, data){
+  const salt = randomBase64(16);
+  const iv = randomBase64(12);
+  const key = await keyForPhrase(phrase, salt);
+  const encrypted = await crypto.subtle.encrypt({ name:'AES-GCM', iv:base64ToBytes(iv) }, key, textEncoder.encode(JSON.stringify(data)));
+  return { version:1, updatedAt:new Date().toISOString(), salt, iv, data:bytesToBase64(new Uint8Array(encrypted)) };
+}
+async function decryptData(phrase, payload){
+  const key = await keyForPhrase(phrase, payload.salt);
+  const decrypted = await crypto.subtle.decrypt({ name:'AES-GCM', iv:base64ToBytes(payload.iv) }, key, base64ToBytes(payload.data));
+  return JSON.parse(textDecoder.decode(decrypted));
+}
+async function readRemoteSync(phrase){
+  const id = await syncIdForPhrase(phrase);
+  const res = await fetch(`/.netlify/functions/sync-data?id=${encodeURIComponent(id)}`);
+  if(res.status === 404) return null;
+  if(!res.ok) throw new Error(await res.text());
+  const { payload } = await res.json();
+  return decryptData(phrase, payload);
+}
+async function writeRemoteSync(phrase, data){
+  const id = await syncIdForPhrase(phrase);
+  const payload = await encryptData(phrase, data);
+  const res = await fetch('/.netlify/functions/sync-data', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ id, payload })
+  });
+  if(!res.ok) throw new Error(await res.text());
+}
+function syncPhrase(){
+  return $('syncPhrase').value.trim();
+}
+function setSyncButtons(disabled){
+  $('syncNowBtn').disabled = disabled;
+  $('pullSyncBtn').disabled = disabled;
+}
+async function syncNow(){
+  const phrase = syncPhrase();
+  if(phrase.length < 12){ setSyncStatus('Use at least 12 characters for your sync phrase.'); return; }
+  setSyncButtons(true); setSyncStatus('Syncing encrypted data...');
+  try {
+    const remote = await readRemoteSync(phrase);
+    if(remote) importRationsData(remote);
+    await writeRemoteSync(phrase, exportRationsData());
+    setSyncStatus('Synced. Use this same phrase on your other device.');
+  } catch (err) {
+    console.warn(err);
+    setSyncStatus('Sync failed. Check the phrase and try again.');
+  } finally {
+    setSyncButtons(false);
+  }
+}
+async function pullSync(){
+  const phrase = syncPhrase();
+  if(phrase.length < 12){ setSyncStatus('Use at least 12 characters for your sync phrase.'); return; }
+  setSyncButtons(true); setSyncStatus('Pulling encrypted data...');
+  try {
+    const remote = await readRemoteSync(phrase);
+    if(!remote){ setSyncStatus('No cloud data found for that phrase yet.'); return; }
+    importRationsData(remote, { preferRemoteGoals:true });
+    setSyncStatus('Pulled latest data onto this device.');
+  } catch (err) {
+    console.warn(err);
+    setSyncStatus('Pull failed. Check the phrase and try again.');
+  } finally {
+    setSyncButtons(false);
+  }
 }
 
 function setTheme(theme){
@@ -176,7 +314,7 @@ function showResult(data){
 $('logBtn').onclick = () => {
   if(!state.lastResult) return;
   const list = meals();
-  list.unshift({...state.lastResult, at:new Date().toISOString()});
+  list.unshift({...state.lastResult, id:mealId(), at:new Date().toISOString()});
   saveMeals(list.slice(0, 200)); setStatus('Meal logged.'); switchTab('today');
 };
 $('clearBtn').onclick = () => { if(confirm('Clear today’s meals?')) saveMeals([]); };
@@ -217,6 +355,8 @@ function fillGoals(){
   const g=goals(); $('goalCalories').value=g.calories; $('goalProtein').value=g.protein; $('goalCarbs').value=g.carbs; $('goalFat').value=g.fat;
 }
 $('saveGoals').onclick=()=>{ localStorage.setItem(goalsKey, JSON.stringify({calories:+$('goalCalories').value||2200, protein:+$('goalProtein').value||160, carbs:+$('goalCarbs').value||250, fat:+$('goalFat').value||70})); renderAll(); alert('Goals saved.'); };
+$('syncNowBtn').onclick = syncNow;
+$('pullSyncBtn').onclick = pullSync;
 function renderAll(){ renderToday(); renderHistory(); fillGoals(); }
 
 
