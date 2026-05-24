@@ -15,6 +15,7 @@ const todayISO = (date = new Date()) => {
 };
 const dayKey = (iso=todayISO()) => `rations:${iso}`;
 const goalsKey = 'rations:goals';
+const promisesKey = 'rations:promises';
 const themeKey = 'rations:theme';
 const defaultGoals = { calories:2200, protein:160, carbs:250, fat:70 };
 const textEncoder = new TextEncoder();
@@ -76,6 +77,15 @@ function goals(){
   const stored = safeJson(localStorage.getItem(goalsKey), defaultGoals);
   return { ...defaultGoals, ...stored };
 }
+function promisedDays(){
+  const stored = safeJson(localStorage.getItem(promisesKey), []);
+  return Array.isArray(stored) ? stored.filter(day => /^\d{4}-\d{2}-\d{2}$/.test(day)) : [];
+}
+function savePromisedDays(days){
+  const uniqueDays = [...new Set(days)].sort();
+  localStorage.setItem(promisesKey, JSON.stringify(uniqueDays));
+  renderAll();
+}
 function setStatus(msg){ $('status').textContent = msg || ''; }
 function setSyncStatus(msg){ $('syncStatus').textContent = msg || ''; }
 const loadingLines = [
@@ -125,7 +135,7 @@ function mergeMeals(localList, remoteList, day){
     .slice(0, 200);
 }
 function exportRationsData(){
-  const data = { version:1, updatedAt:new Date().toISOString(), goals:goals(), meals:{} };
+  const data = { version:1, updatedAt:new Date().toISOString(), goals:goals(), promises:promisedDays(), meals:{} };
   historyDays().forEach(day => {
     data.meals[day] = meals(day).map((meal, index) => normalizeMeal(meal, day, index));
   });
@@ -140,6 +150,10 @@ function importRationsData(remoteData, options={}){
   });
   const useRemoteGoals = options.preferRemoteGoals || !localStorage.getItem(goalsKey);
   if(remoteData?.goals && useRemoteGoals) localStorage.setItem(goalsKey, JSON.stringify({ ...defaultGoals, ...remoteData.goals }));
+  if(Array.isArray(remoteData?.promises)){
+    savePromisedDays([...promisedDays(), ...remoteData.promises]);
+    return;
+  }
   renderAll();
 }
 function bytesToBase64(bytes){
@@ -329,15 +343,67 @@ $('logBtn').onclick = () => {
   list.unshift({...state.lastResult, id:mealId(), at:new Date().toISOString()});
   saveMeals(list.slice(0, 200)); setStatus('Meal logged.'); switchTab('today');
 };
-$('clearBtn').onclick = () => { if(confirm('Clear today’s meals?')) saveMeals([]); };
+$('clearBtn').onclick = () => {
+  if(!confirm('Clear today’s meals?')) return;
+  const today = todayISO();
+  localStorage.setItem(promisesKey, JSON.stringify(promisedDays().filter(day => day !== today)));
+  saveMeals([]);
+};
 $('clearHistoryBtn').onclick = () => {
   if(!confirm('Clear all saved Rations history on this device?')) return;
   Object.keys(localStorage).filter(k=>k.startsWith('rations:') && /^rations:\d{4}-\d{2}-\d{2}$/.test(k)).forEach(k=>localStorage.removeItem(k));
+  localStorage.removeItem(promisesKey);
   renderAll();
 };
 
 function sumMeals(list){
   return list.reduce((a,m)=>({calories:a.calories+(+m.calories||0),protein:a.protein+(+m.protein_g||0),carbs:a.carbs+(+m.carbs_g||0),fat:a.fat+(+m.fat_g||0)}),{calories:0,protein:0,carbs:0,fat:0});
+}
+function addDaysISO(day, offset){
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + offset);
+  return date.toISOString().slice(0, 10);
+}
+function goalStatus(day=todayISO()){
+  const g = goals();
+  const sum = sumMeals(meals(day));
+  return {
+    sum,
+    metProtein:sum.protein >= g.protein,
+    underCalories:sum.calories <= g.calories,
+    complete:sum.protein >= g.protein && sum.calories <= g.calories
+  };
+}
+function isPromisedGoalDay(day){
+  return promisedDays().includes(day) && goalStatus(day).complete;
+}
+function streakCount(){
+  let day = isPromisedGoalDay(todayISO()) ? todayISO() : addDaysISO(todayISO(), -1);
+  let count = 0;
+  while(isPromisedGoalDay(day)){
+    count += 1;
+    day = addDaysISO(day, -1);
+  }
+  return count;
+}
+function renderStreak(){
+  const today = todayISO();
+  const status = goalStatus(today);
+  const promised = promisedDays().includes(today);
+  const missingProtein = Math.max(0, goals().protein - status.sum.protein);
+  const overCalories = Math.max(0, status.sum.calories - goals().calories);
+  $('streakCount').textContent = `${streakCount()} ${streakCount() === 1 ? 'day' : 'days'}`;
+  $('promiseBtn').disabled = !status.complete || promised;
+  $('promiseBtn').textContent = promised && status.complete ? 'Promised' : 'Promise Today';
+  if(promised && status.complete){
+    $('streakStatus').textContent = 'Today counts: protein goal hit and calories stayed under.';
+  } else if(status.complete){
+    $('streakStatus').textContent = 'You hit both goals today. Tap Promise Today to lock it in.';
+  } else if(overCalories > 0){
+    $('streakStatus').textContent = `${Math.round(overCalories)} calories over today, so the streak cannot count yet.`;
+  } else {
+    $('streakStatus').textContent = `${Math.round(missingProtein)}g protein left before today can count.`;
+  }
 }
 function renderToday(){
   $('todayDate').textContent = `${new Date().toLocaleDateString([], {timeZone:appTimeZone, weekday:'long', month:'short', day:'numeric'})} CT`;
@@ -346,6 +412,7 @@ function renderToday(){
   $('totalProtein').textContent = `${Math.round(sum.protein)}g / ${g.protein}g`;
   $('totalCarbs').textContent = `${Math.round(sum.carbs)}g / ${g.carbs}g`;
   $('totalFat').textContent = `${Math.round(sum.fat)}g / ${g.fat}g`;
+  renderStreak();
   $('log').innerHTML = list.length ? list.map(mealRow).join('') : '<p class="empty">No meals logged today.</p>';
 }
 function mealRow(m){
@@ -367,6 +434,7 @@ function fillGoals(){
   const g=goals(); $('goalCalories').value=g.calories; $('goalProtein').value=g.protein; $('goalCarbs').value=g.carbs; $('goalFat').value=g.fat;
 }
 $('saveGoals').onclick=()=>{ localStorage.setItem(goalsKey, JSON.stringify({calories:+$('goalCalories').value||2200, protein:+$('goalProtein').value||160, carbs:+$('goalCarbs').value||250, fat:+$('goalFat').value||70})); renderAll(); alert('Goals saved.'); };
+$('promiseBtn').onclick=()=>{ if(goalStatus().complete) savePromisedDays([...promisedDays(), todayISO()]); };
 $('syncNowBtn').onclick = syncNow;
 $('pullSyncBtn').onclick = pullSync;
 function renderAll(){ renderToday(); renderHistory(); fillGoals(); }
