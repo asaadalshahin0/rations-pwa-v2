@@ -1,8 +1,9 @@
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') return json({ error: 'Method not allowed' }, 405);
-    const { imageBase64 = '', notes = '' } = JSON.parse(event.body || '{}');
+    const { imageBase64 = '', notes = '', foodMemory = '' } = JSON.parse(event.body || '{}');
     const cleanNotes = String(notes || '').trim().slice(0, 1200);
+    const cleanFoodMemory = String(foodMemory || '').trim().slice(0, 3000);
     if (!imageBase64 && !cleanNotes) return json({ error: 'Add a photo or meal description.' }, 400);
     if (!process.env.OPENAI_API_KEY) return json({ error: 'Missing OPENAI_API_KEY' }, 500);
 
@@ -10,6 +11,7 @@ exports.handler = async (event) => {
       imageBase64 ? 'Estimate calories and macros from this food image.' : 'Estimate calories and macros from this meal description.',
       'Return strict JSON only with: meal_name, calories, protein_g, carbs_g, fat_g, fiber_g, confidence, items array with name portion calories protein_g carbs_g fat_g fiber_g, coach_note.',
       'Use conservative estimates and mention uncertainty in confidence when portions are unclear.',
+      cleanFoodMemory ? `Persistent user food memory. Treat these saved foods, brands, portions, and macros as authoritative when the meal mentions or visually matches them; ignore unrelated entries. ${cleanFoodMemory}` : 'No persistent user food memory saved.',
       `Notes: ${cleanNotes || 'none'}`
     ].join(' ');
     const content = [{ type: 'input_text', text: prompt }];

@@ -17,6 +17,7 @@ const dayKey = (iso=todayISO()) => `rations:${iso}`;
 const goalsKey = 'rations:goals';
 const promisesKey = 'rations:promises';
 const themeKey = 'rations:theme';
+const foodMemoryKey = 'rations:food-memory';
 const defaultGoals = { calories:2200, protein:160, carbs:250, fat:70 };
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -77,6 +78,15 @@ function goals(){
   const stored = safeJson(localStorage.getItem(goalsKey), defaultGoals);
   return { ...defaultGoals, ...stored };
 }
+function foodMemory(){
+  return String(localStorage.getItem(foodMemoryKey) || '').trim().slice(0, 3000);
+}
+function saveFoodMemory(value){
+  const clean = String(value || '').trim().slice(0, 3000);
+  if(clean) localStorage.setItem(foodMemoryKey, clean);
+  else localStorage.removeItem(foodMemoryKey);
+  renderAll();
+}
 function promisedDays(){
   const stored = safeJson(localStorage.getItem(promisesKey), []);
   return Array.isArray(stored) ? stored.filter(day => /^\d{4}-\d{2}-\d{2}$/.test(day)) : [];
@@ -135,7 +145,7 @@ function mergeMeals(localList, remoteList, day){
     .slice(0, 200);
 }
 function exportRationsData(){
-  const data = { version:1, updatedAt:new Date().toISOString(), goals:goals(), promises:promisedDays(), meals:{} };
+  const data = { version:2, updatedAt:new Date().toISOString(), goals:goals(), promises:promisedDays(), foodMemory:foodMemory(), meals:{} };
   historyDays().forEach(day => {
     data.meals[day] = meals(day).map((meal, index) => normalizeMeal(meal, day, index));
   });
@@ -150,6 +160,8 @@ function importRationsData(remoteData, options={}){
   });
   const useRemoteGoals = options.preferRemoteGoals || !localStorage.getItem(goalsKey);
   if(remoteData?.goals && useRemoteGoals) localStorage.setItem(goalsKey, JSON.stringify({ ...defaultGoals, ...remoteData.goals }));
+  const remoteFoodMemory = String(remoteData?.foodMemory || '').trim();
+  if(remoteFoodMemory && (options.preferRemoteGoals || !foodMemory())) localStorage.setItem(foodMemoryKey, remoteFoodMemory.slice(0, 3000));
   if(Array.isArray(remoteData?.promises)){
     savePromisedDays([...promisedDays(), ...remoteData.promises]);
     return;
@@ -313,7 +325,7 @@ $('analyzeBtn').onclick = async () => {
   setStatus(state.imageBase64 ? 'Uploading smaller photo...' : 'Estimating from description...');
   $('analyzeBtn').disabled = true; setLoading(true);
   try {
-    const body = JSON.stringify({ imageBase64:state.imageBase64, notes });
+    const body = JSON.stringify({ imageBase64:state.imageBase64, notes, foodMemory:foodMemory() });
     const res = await fetch('/.netlify/functions/analyze-meal', { method:'POST', headers:{'Content-Type':'application/json'}, body });
     if(!res.ok) throw new Error(await res.text());
     showResult(await res.json()); setStatus('Estimate complete.');
@@ -432,8 +444,10 @@ function renderHistory(){
 }
 function fillGoals(){
   const g=goals(); $('goalCalories').value=g.calories; $('goalProtein').value=g.protein; $('goalCarbs').value=g.carbs; $('goalFat').value=g.fat;
+  $('foodMemory').value = foodMemory();
 }
 $('saveGoals').onclick=()=>{ localStorage.setItem(goalsKey, JSON.stringify({calories:+$('goalCalories').value||2200, protein:+$('goalProtein').value||160, carbs:+$('goalCarbs').value||250, fat:+$('goalFat').value||70})); renderAll(); alert('Goals saved.'); };
+$('saveFoodMemory').onclick=()=>{ saveFoodMemory($('foodMemory').value); $('foodMemoryStatus').textContent = foodMemory() ? 'Food memory saved and will be included in future AI estimates.' : 'Food memory cleared.'; };
 $('promiseBtn').onclick=()=>{ if(goalStatus().complete) savePromisedDays([...promisedDays(), todayISO()]); };
 $('syncNowBtn').onclick = syncNow;
 $('pullSyncBtn').onclick = pullSync;
