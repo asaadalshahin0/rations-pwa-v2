@@ -6,12 +6,12 @@ Local-first PWA for logging meals, estimating calories/macros from a photo or te
 
 ## Active Task
 
-Complete: add persistent food memory so saved user foods, brands, portions, and macros are included in future AI meal estimates.
+Complete: replace manual food memory with automatic learned food memory from meals the user logs normally.
 
 ## Latest Progress
 
-The Goals tab now has a Food Memory card backed by localStorage. Saved memory is included in encrypted sync exports/imports and sent to the Netlify meal analyzer, where the OpenAI prompt treats matching saved foods as authoritative context.
+The app now learns food memory automatically when a meal is logged, stores structured learned food entries locally, shows a read-only Learned Foods list in Goals, includes learned entries in encrypted sync, and sends learned context to the Netlify meal analyzer.
 
 ## Smallest Next Step
 
-Test the deployed app with a saved entry such as "Ratio cereal: 1 serving is 220 calories and 20g protein", then estimate a meal that mentions Ratio cereal.
+Use the app normally: every logged meal can teach future AI estimates, and the Learned Foods panel can clear the learned context if needed.

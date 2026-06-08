@@ -124,12 +124,12 @@
       <section class="card">
         <div class="section-head">
           <div>
-            <h2>Food Memory</h2>
-            <p class="muted">Saved foods, brands, portions, and macros the AI should remember.</p>
+            <h2>Learned Foods</h2>
+            <p class="muted">Automatically learned from meals you log.</p>
           </div>
+          <button id="clearFoodMemory" class="ghost" type="button">Clear</button>
         </div>
-        <textarea id="foodMemory" rows="6" maxlength="3000" placeholder="Ratio cereal: 1 serving is 220 calories and 20g protein. Keto bread: 1 slice is 35 calories, 4g protein, 1g net carb."></textarea>
-        <button id="saveFoodMemory" class="primary soft" type="button">Save Food Memory</button>
+        <div id="foodMemory" class="memory-list"></div>
         <p id="foodMemoryStatus" class="status"></p>
       </section>
 
